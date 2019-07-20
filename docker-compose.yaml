@@ -1,0 +1,58 @@
+# This filee was modified from the original at: 
+# https://github.com/matrix-org/synapse/blob/master/contrib/docker/docker-compose.yml .
+
+version: '3'
+services:
+
+  app:
+    image: matrixdotorg/synapse:latest
+    container_name: matrix-synapse
+    # Since synapse does not retry to connect to the database, restart upon
+    # failure
+    restart: unless-stopped
+    # See the readme for a full documentation of the environment settings.
+    # We are providing the SYNAPSE_CONFIG_PATH env. variable here so that
+    # the container won't dynamically build the config file and to user
+    # a static file that we maintain.  We do this since there are some options
+    # that are not supported by env. vars. 
+    environment:
+      - SYNAPSE_CONFIG_PATH=/data/homeserver.yaml
+    volumes:
+      # You may either store all the files in a local folder
+      - /docker-volumes/matrix/synapse:/data
+      - /docker-volumes/matrix/synapse/matrix.domain_name_here.config:/compiled/log.config
+      # .. or you may split this between different storage points
+      # - ./files:/data
+      # - /path/to/ssd:/data/uploads
+      # - /path/to/large_hdd:/data/media
+    depends_on:
+      - db
+    # In order to expose Synapse, remove one of the following, you might for
+    # instance expose the TLS port directly.  The below port mapping from 80:8009
+    # is for LetsEncrypt support.
+    # We use LetsEncrypt here.
+    ports:
+      - 443:8448/tcp
+      - 80:8009/tcp
+    # ... or use a reverse proxy, here is an example for traefik:
+    #labels:
+    #  - traefik.enable=true
+    #  - traefik.frontend.rule=Host:my.matrix.Host
+    #  - traefik.port=8008
+    networks:
+      - matrix
+
+  db:
+    image: postgres:latest
+    container_name: matrix-postgres
+    environment:
+      - POSTGRES_USER=matrix_user
+      - POSTGRES_PASSWORD=matrix_pass
+    volumes:
+      - /docker-volumes/matrix/postgres/data:/var/lib/postgresql/data
+    networks:
+      - matrix
+
+networks:
+  matrix:
+    driver: bridge
